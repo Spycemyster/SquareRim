@@ -1,0 +1,4 @@
+.vscode/
+.mono/
+*.csproj
+*.sln

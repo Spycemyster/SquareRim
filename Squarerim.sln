@@ -1,0 +1,19 @@
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Squarerim", "Squarerim.csproj", "{3946D5F0-14AE-4C37-998D-FBD9BEBDB23E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+	Debug|Any CPU = Debug|Any CPU
+	ExportDebug|Any CPU = ExportDebug|Any CPU
+	ExportRelease|Any CPU = ExportRelease|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3946D5F0-14AE-4C37-998D-FBD9BEBDB23E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3946D5F0-14AE-4C37-998D-FBD9BEBDB23E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3946D5F0-14AE-4C37-998D-FBD9BEBDB23E}.ExportDebug|Any CPU.ActiveCfg = ExportDebug|Any CPU
+		{3946D5F0-14AE-4C37-998D-FBD9BEBDB23E}.ExportDebug|Any CPU.Build.0 = ExportDebug|Any CPU
+		{3946D5F0-14AE-4C37-998D-FBD9BEBDB23E}.ExportRelease|Any CPU.ActiveCfg = ExportRelease|Any CPU
+		{3946D5F0-14AE-4C37-998D-FBD9BEBDB23E}.ExportRelease|Any CPU.Build.0 = ExportRelease|Any CPU
+	EndGlobalSection
+EndGlobal

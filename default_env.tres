@@ -1,7 +1,11 @@
 [gd_resource type="Environment" load_steps=2 format=2]
 
 [sub_resource type="ProceduralSky" id=1]
+sun_color = Color( 1, 0.243137, 0.243137, 1 )
+sun_curve = 0.0965937
+sun_energy = 13.45
 
 [resource]
 background_mode = 2
 background_sky = SubResource( 1 )
+ssao_edge_sharpness = 32.0

@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using Godot.Collections;
 using Godot;
 
 /// <summary>
@@ -11,14 +13,14 @@ public class Chunk : Node
     /// </summary>
     /// <value></value>
     private readonly static Vector3[] CUBE_CORNERS = new Vector3[8] {
-        new Vector3(0, 0, 0), // 0
-        new Vector3(1, 0, 0), // 1
-        new Vector3(0, 0, 1), // 2
-        new Vector3(1, 0, 1), // 3
-        new Vector3(0, 1, 0), // 4
-        new Vector3(1, 1, 0), // 5
-        new Vector3(0, 1, 1), // 6
-        new Vector3(1, 1, 1)  // 7
+        new Vector3(0, 0, 0) - new Vector3(0.5f, 0.5f, 0.5f), // 0
+        new Vector3(1, 0, 0) - new Vector3(0.5f, 0.5f, 0.5f), // 1
+        new Vector3(0, 0, 1) - new Vector3(0.5f, 0.5f, 0.5f), // 2
+        new Vector3(1, 0, 1) - new Vector3(0.5f, 0.5f, 0.5f), // 3
+        new Vector3(0, 1, 0) - new Vector3(0.5f, 0.5f, 0.5f), // 4
+        new Vector3(1, 1, 0) - new Vector3(0.5f, 0.5f, 0.5f), // 5
+        new Vector3(0, 1, 1) - new Vector3(0.5f, 0.5f, 0.5f), // 6
+        new Vector3(1, 1, 1) - new Vector3(0.5f, 0.5f, 0.5f)  // 7
     };
     private List<Vector3> vertices;
     private List<Vector2> uvs;
@@ -29,7 +31,7 @@ public class Chunk : Node
     private ArrayMesh mesh;
     private uint[][][] data;
 
-    private const uint BLOCK_TEXTURE_NUM = 5;
+    public const uint BLOCK_TEXTURE_NUM = 6;
     private ChunkGenerator chunkGenerator;
 
     /// <summary>
@@ -47,13 +49,76 @@ public class Chunk : Node
         color = new Color(0.9f, 0.1f, 0.1f, 1f);
     }
 
+    public void SaveWorld(string folder)
+    {
+        Directory directory = new Directory();
+        directory.MakeDirRecursive(folder);
+        File f = new File();
+        f.Open($"{folder}/({chunkX})({chunkZ}).json", File.ModeFlags.WriteRead);
+        Array<Array<Array<uint>>> dataFormatted = new Array<Array<Array<uint>>>();
+        for (int i = 0; i < data.Length; i++)
+        {
+            dataFormatted.Add(new Array<Array<uint>>());
+            for (int j = 0; j < data[i].Length; j++)
+            {
+                dataFormatted[i].Add(new Array<uint>(data[i][j]));
+            }
+        }
+        
+        f.StoreString(JSON.Print(dataFormatted));
+        f.Close();
+    }
+
+    public static uint[][][] LoadWorld(string filePath)
+    {
+        File f = new File();
+        f.Open(filePath, File.ModeFlags.Read);
+
+        string read = f.GetAsText();
+        Array res = (Array)GD.Convert(JSON.Parse(read).Result, Variant.Type.Array);
+        uint[][][] loaded = new uint[res.Count][][];
+        for (int i = 0; i < res.Count; i++)
+        {
+            Array res2 = (Array)res[i];
+            loaded[i] = new uint[res2.Count][];
+            for (int j = 0; j < res2.Count; j++)
+            {
+                Array res3 = (Array)res2[j];
+                loaded[i][j] = new uint[res3.Count];
+                for (int k = 0; k < res3.Count; k++)
+                {
+                    loaded[i][j][k] = System.Convert.ToUInt16(res3[k]);
+                }
+            }
+        }
+        f.Close();
+
+        return loaded;
+    }
+
     /// <summary>
     /// Clears the uvs and vertice data. Call GenerateMesh() afterwards to remove the chunk mesh.
     /// </summary>
-    public void ClearBlocks()
+    private void ClearBlocks()
     {
+        DebugText.Instance.Vertices -= vertices.Count;
         uvs.Clear();
         vertices.Clear();
+    }
+
+    public uint[][][] GetData()
+    {
+        return (uint[][][])data.Clone();
+    }
+
+    public uint GetBlockAt(int x, int y, int z)
+    {
+        return data[y][x][z];
+    }
+
+    public void ChangeBlockAt(int x, int y, int z, uint id)
+    {
+        data[y][x][z] = id;
     }
 
     /// <summary>
@@ -132,16 +197,17 @@ public class Chunk : Node
         GetNode<MeshInstance>("MeshInstance").Mesh = mesh;
     }
 
-    public void RegenerateMesh()
+    public async Task RegenerateMesh()
     {
-        GenerateMesh();
+        await GenerateMesh();
     }
 
     /// <summary>
     /// Takes the current vertice/uv data and generate a mesh with it.
     /// </summary>
-    public void GenerateMesh()
+    public async Task GenerateMesh()
     {
+        ClearBlocks();
         // data is a 3 dimensional array
         // data[i] represents a 2d horizontal plane at level i
         // data[i][j] represents a 1d line of blocks at level i and row j
@@ -198,6 +264,7 @@ public class Chunk : Node
                 }
             }
         }
+        DebugText.Instance.Vertices += vertices.Count;
         SurfaceTool st = new SurfaceTool();
         st.Begin(Mesh.PrimitiveType.Triangles);
         st.SetMaterial(material);
@@ -221,8 +288,6 @@ public class Chunk : Node
 
         CollisionShape cs = GetNode<CollisionShape>("CollisionShape");
         cs.Shape = mesh.CreateTrimeshShape();
-
-        ClearBlocks();
     }
 
     // texture mapping notes
@@ -232,13 +297,16 @@ public class Chunk : Node
     // - S_(u, v) -> u = 1 / 6.0f * index, v = 1 / BLOCK_NUM * BlockId
     // - E_(u, v) -> S_u + 1/6.0f, S_v + 1 / BLOCK_NUM;
     // - UV = S_(u, v) + uv_x * <1 / 6.0f, 0> + uv_y * <0, 1 / BLOCK_NUM * BlockId>
-    
+    private const float dx = 1.0f / 6.0f;
+    private const float dy = 1.0f / BLOCK_TEXTURE_NUM;
     private void AddBotFace(Vector3 offset, uint id = 0)
     {
+        AddBotFace(vertices, uvs, offset, id);
+    }
+    public static void AddBotFace(List<Vector3> vertices, List<Vector2> uvs, Vector3 offset, uint id = 0)
+    {
         // TODO: These constants can probably be calculated at a higher stack
-        Vector2 uvStart = new Vector2(1/6.0f, 1.0f / BLOCK_TEXTURE_NUM * (float)id);
-        float dx = 1 / 6.0f;
-        float dy = 1.0f / BLOCK_TEXTURE_NUM;
+        Vector2 uvStart = new Vector2(dx, dy * (float)id);
 
         // -y face (bottom)
         vertices.Add(CUBE_CORNERS[0] + offset);
@@ -255,13 +323,14 @@ public class Chunk : Node
         uvs.Add(uvStart + new Vector2(dx, dy));
         uvs.Add(uvStart + new Vector2(0, dy));
     }
-
     private void AddTopFace(Vector3 offset, uint id = 0)
     {
+        AddTopFace(vertices, uvs, offset, id);
+    }
+    public static void AddTopFace(List<Vector3> vertices, List<Vector2> uvs, Vector3 offset, uint id = 0)
+    {
         // TODO: These constants can probably be calculated at a higher stack
-        Vector2 uvStart = new Vector2(0, 1.0f / BLOCK_TEXTURE_NUM * (float)id);
-        float dx = 1 / 6.0f;
-        float dy = 1.0f / BLOCK_TEXTURE_NUM;
+        Vector2 uvStart = new Vector2(0, dy * (float)id);
         
         // +y face (top)
         vertices.Add(CUBE_CORNERS[5] + offset);
@@ -278,13 +347,14 @@ public class Chunk : Node
         uvs.Add(uvStart + new Vector2(dx, dy));
         uvs.Add(uvStart + new Vector2(dx, 0));
     }
-
     private void AddFrontFace(Vector3 offset, uint id = 0)
     {
+        AddFrontFace(vertices, uvs, offset, id);
+    }
+    public static void AddFrontFace(List<Vector3> vertices, List<Vector2> uvs, Vector3 offset, uint id = 0)
+    {
         // TODO: These constants can probably be calculated at a higher stack
-        Vector2 uvStart = new Vector2(1/6.0f * 3, 1.0f / BLOCK_TEXTURE_NUM * (float)id);
-        float dx = 1 / 6.0f;
-        float dy = 1.0f / BLOCK_TEXTURE_NUM;
+        Vector2 uvStart = new Vector2(dx * 3, dy * (float)id);
 
         // +x face (forward)
         vertices.Add(CUBE_CORNERS[7] + offset);
@@ -305,10 +375,12 @@ public class Chunk : Node
 
     private void AddBackFace(Vector3 offset, uint id = 0)
     {
+        AddBackFace(vertices, uvs, offset, id);
+    }
+    public static void AddBackFace(List<Vector3> vertices, List<Vector2> uvs, Vector3 offset, uint id = 0)
+    {
         // TODO: These constants can probably be calculated at a higher stack
-        Vector2 uvStart = new Vector2(1/6.0f * 5, 1.0f / BLOCK_TEXTURE_NUM * (float)id);
-        float dx = 1 / 6.0f;
-        float dy = 1.0f / BLOCK_TEXTURE_NUM;
+        Vector2 uvStart = new Vector2(dx * 5.0f, dy * (float)id);
         
         // -x face (backward)
         vertices.Add(CUBE_CORNERS[4] + offset);
@@ -328,10 +400,12 @@ public class Chunk : Node
 
     private void AddLeftFace(Vector3 offset, uint id = 0)
     {
+        AddLeftFace(vertices, uvs, offset, id);
+    }
+    public static void AddLeftFace(List<Vector3> vertices, List<Vector2> uvs, Vector3 offset, uint id = 0)
+    {
         // TODO: These constants can probably be calculated at a higher stack
-        Vector2 uvStart = new Vector2(1/6.0f * 4, 1.0f / BLOCK_TEXTURE_NUM * (float)id);
-        float dx = 1 / 6.0f;
-        float dy = 1.0f / BLOCK_TEXTURE_NUM;
+        Vector2 uvStart = new Vector2(dx * 4.0f, dy * (float)id);
 
         // -z face (left)
         vertices.Add(CUBE_CORNERS[5] + offset);
@@ -351,10 +425,12 @@ public class Chunk : Node
 
     private void AddRightFace(Vector3 offset, uint id = 0)
     {
+        AddRightFace(vertices, uvs, offset, id);
+    }
+    public static void AddRightFace(List<Vector3> vertices, List<Vector2> uvs, Vector3 offset, uint id = 0)
+    {
         // TODO: These constants can probably be calculated at a higher stack
-        Vector2 uvStart = new Vector2(1/6.0f * 2, 1.0f / BLOCK_TEXTURE_NUM * (float)id);
-        float dx = 1 / 6.0f;
-        float dy = 1.0f / BLOCK_TEXTURE_NUM;
+        Vector2 uvStart = new Vector2(dx * 2.0f, dy * (float)id);
 
         // +z face (right)
         vertices.Add(CUBE_CORNERS[2] + offset);

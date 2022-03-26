@@ -7,17 +7,21 @@ public class DebugText : Control
     // private int a = 2;
     // private string b = "text";
     public static DebugText Instance;
+    public long Vertices;
     public int ChunksLoaded;
     public int ChunksQueued;
     private Label textLabel;
     public Vector3 RenderTargetPosition;
     private const int BYTES_TO_MEGABYTES = 1024 * 1024;
-
+    public override void _EnterTree()
+    {
+        base._EnterTree();
+        Instance = this;
+    }
     // Called when the node enters the scene tree for the first time.
     public override void _Ready()
     {
         textLabel = GetNode<Label>("DebugText");
-        Instance = this;
     }
 
     // Called every frame. 'delta' is the elapsed time since the previous frame.
@@ -28,6 +32,7 @@ public class DebugText : Control
         float maxMemory = (Performance.GetMonitor(Performance.Monitor.MemoryStaticMax)
         + Performance.GetMonitor(Performance.Monitor.MemoryDynamicMax)) / BYTES_TO_MEGABYTES;
         textLabel.Text = $"RAM: {totalMemory}/{maxMemory} MB\nFPS {Engine.GetFramesPerSecond()}\n" +
-            $"Chunks Loaded: {ChunksLoaded}\nChunks Queued: {ChunksQueued}\nPosition: {RenderTargetPosition.x}, {RenderTargetPosition.y}, {RenderTargetPosition.z}";
+            $"Chunks Loaded: {ChunksLoaded}\nChunks Queued: {ChunksQueued}\nPosition: {RenderTargetPosition.x}, {RenderTargetPosition.y}, {RenderTargetPosition.z}" +
+            $"\nVertices: {Vertices}\nTriangles: {Vertices / 3}";
     }
 }

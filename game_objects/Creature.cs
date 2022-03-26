@@ -12,6 +12,11 @@ public class Creature : KinematicBody
     private RayCast mLeftRc, mRightRc, mForwardRc, mEdgeRc;
     private Timer mTargetTimer;
     private bool mIsResting = false;
+    [Export]
+    private int mMaxHealth = 100;
+    [Export]
+    private float mHurtTimer = 0.2f;
+    private int mCurrentHealth;
 
     [Export]
     private float mJumpMagnitude = 11f;
@@ -19,17 +24,55 @@ public class Creature : KinematicBody
     [Export]
     private float mMovementSpeed = 5;
 
+    private MeshInstance mMeshInst;
+    private Color mMeshOriginalColor;
+    private Timer mResetColorTimer;
+
     // Called when the node enters the scene tree for the first time.
     public override void _Ready()
     {
+        mCurrentHealth = mMaxHealth;
         rng = new RandomNumberGenerator();
         rng.Randomize();
+        mMeshInst = GetNode<MeshInstance>("MeshInstance");
         mLeftRc = GetNode<RayCast>("LeftCast");
         mRightRc = GetNode<RayCast>("RightCast");
         mForwardRc = GetNode<RayCast>("ForwardCast");
         mEdgeRc = GetNode<RayCast>("EdgeGuardCast");
         mTargetTimer = GetNode<Timer>("TargetTimer");
         mTargetTimer.Connect("timeout", this, "randomizeTarget");
+    }
+
+    private void dealDamage(int damage, Godot.Object dealer)
+    {
+        mCurrentHealth -= damage;
+        if (mCurrentHealth <= 0)
+        {
+            dealer.Call("GainExperience", 1);
+            QueueFree();
+            return;
+        }
+        SpatialMaterial newMaterial = new SpatialMaterial();
+        newMaterial.AlbedoColor = new Color(1, 0, 0, 1);
+        mMeshInst.MaterialOverride = newMaterial;
+        if (mResetColorTimer != null)
+        {
+            mResetColorTimer.Start(mHurtTimer);
+            return;
+        }
+        mResetColorTimer = new Timer();
+        mResetColorTimer.WaitTime = mHurtTimer;
+        mResetColorTimer.OneShot = true;
+        mResetColorTimer.Connect("timeout", this, "resetColor");
+        AddChild(mResetColorTimer);
+        mResetColorTimer.Start();
+    }
+
+    private void resetColor()
+    {
+        mMeshInst.MaterialOverride = null;
+        mResetColorTimer.QueueFree();
+        mResetColorTimer = null;
     }
 
     public override void _Process(float delta)
